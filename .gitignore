@@ -1,0 +1,7 @@
+*.ipynb
+*.pyc
+**/.ipynb_checkpoints/
+/download_name_files.py
+*.png
+**/.idea/
+/data/character_names/
