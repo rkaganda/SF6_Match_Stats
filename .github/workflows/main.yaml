@@ -1,0 +1,45 @@
+name: Create exe, zip files for release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.x
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt;
+
+    - name: Install PyInstaller
+      run: pip install pyinstaller
+
+    - name: Install 7-Zip
+      run: choco install 7zip
+
+    - name: Create standalone executable
+      run: pyinstaller --onefile --name=SF6_match_stats replay_stats_ui.py
+
+    - name: Create exe zip bundle
+      run: 7z a 'SF6_match_stats_bundle.zip' './dist/SF6_match_stats.exe' './data/' './scripts/' '-x!./data/character_names/*'
+
+    - name: Install GitHub CLI
+      run: |
+        choco install gh
+
+    - name: Create GitHub Release and Upload Zip
+      run: |
+        echo "${{ secrets.GH_PAT }}" | gh auth login --with-token
+        gh release create ${{ github.ref }} SF6_match_stats_bundle.zip --title "Release ${{ github.ref }}" --notes "Release notes for ${{ github.ref }}"

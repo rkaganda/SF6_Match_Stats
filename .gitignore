@@ -5,3 +5,4 @@
 *.png
 **/.idea/
 /data/character_names/
+/.github/workflows/main.yaml
