@@ -22,7 +22,7 @@ replay_dir = 'C:/SteamLibrary/steamapps/common/Street Fighter 6/'
 replay_name = 'recent_replay.json'
 
 # load character id to name str mappings
-with open(f"data/character_names/character_ids.json", 'r') as f:
+with open(f"data/character_ids.json", 'r') as f:
     character_ids = json.load(f)
 
 # load act_st id to string mappings
