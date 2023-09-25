@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, filedialog
+from PIL import Image, ImageTk
 import threading
 import queue
 
@@ -19,6 +20,9 @@ class MatchStatsUI:
         # update_plots flag
         self.keep_running = threading.Event()
         self.keep_running.set()
+
+        # notebook for images
+        self.notebook = None
         
         master.title("Replay Stats")
 
@@ -40,11 +44,50 @@ class MatchStatsUI:
         self.start_button = ttk.Button(master, text="Start", command=self.on_start)
         self.start_button.grid(row=2, column=0, columnspan=3, pady=20, padx=10, sticky='w')
 
+        # New Window Button
+        self.new_window_button = ttk.Button(master, text="View Recent Match Stats...", command=self.create_new_window)
+        self.new_window_button.grid(row=2, column=2, columnspan=3, pady=20, padx=10, sticky='w')
+
         # update_plots status flag
         self.status_update = threading.Event()
 
         # bind to destroy on_close
         self.master.bind('<Destroy>', self.on_close)
+
+    def add_notebook_ing(self, img_path, label):
+        try:
+            img = Image.open(img_path)
+            frame = ttk.Frame(self.notebook)
+            self.notebook.add(frame, text=label)
+
+            photo = ImageTk.PhotoImage(img)
+
+            label = ttk.Label(frame, image=photo)
+            label.image = photo  # Keep reference to avoid garbage collection
+            label.pack(padx=10, pady=10)
+        except FileNotFoundError:
+            print(f"missing {img_path}")
+            pass
+
+    def create_new_window(self):
+        new_window = tk.Toplevel(self.master)
+        new_window.title("Match Plots")
+
+        self.notebook = ttk.Notebook(new_window)
+
+        for round_num in range(0, 4):
+            for player_num in range(1, 3):
+                image_path = f"stats_img/round{round_num}_player{player_num}_dmg.png"
+                label = f"Round {round_num} Player {player_num} Damage"
+                self.add_notebook_ing(image_path, label)
+            image_path = f"stats_img/round{round_num}_drive.png"
+            label = f"Round {int(round_num+1)} Drive Usage/Lost"
+            self.add_notebook_ing(image_path, label)
+        image_path = f'stats_img/match_stats.png'
+        label = f"Match Statistics"
+        self.add_notebook_ing(image_path, label)
+
+        self.notebook.pack(padx=10, pady=10, expand=True, fill=tk.BOTH)
 
     def browse_folder(self):
         folder_selected = filedialog.askdirectory()

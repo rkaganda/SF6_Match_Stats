@@ -177,7 +177,7 @@ def create_damage_seq(p_idx, df):
     return damage_seqs
 
 
-def create_damage_stats(p_idx: str, damage_seqs: Dict, df: pd.DataFrame) -> Dict[str, Dict]:
+def create_damage_stats(p_idx: str, damage_seqs: list, df: pd.DataFrame) -> Dict[str, Dict]:
     other_p_idx = "2" if p_idx == "1" else "1"
     damage_stats = {}
 
@@ -198,6 +198,51 @@ def create_damage_stats(p_idx: str, damage_seqs: Dict, df: pd.DataFrame) -> Dict
             action_stats['total'] = action_stats['total'] + (total_damage * -1)
 
     return damage_stats
+
+
+def create_action_counts(df):
+    action_counts = {}
+    for p_tag in ["1", "2"]:
+        print(f"p_tag={p_tag}")
+        # calculate a boolean mask where the actionName value changes
+        mask = df[f'p{p_tag}_actionName'] != df[f'p{p_tag}_actionName'].shift()
+
+        # cumsum to create a continuous sequence indicator
+        df[f'p{p_tag}_actionName_sequence'] = mask.cumsum()
+
+        # group by actionName and sequence and count occurrences
+        sequence_counts = df.groupby([f'p{p_tag}_actionName', f'p{p_tag}_actionName_sequence']).size().reset_index(
+            name='count')
+
+        # count the number of sequences for each unique action name
+        result = sequence_counts.groupby(f'p{p_tag}_actionName').size().reset_index(name='number_of_sequences')
+        action_counts[p_tag] = result
+    return action_counts
+
+
+def generate_action_count(player_seq_counts, action_label, action_names, round_metrics, total_metrics):
+    # store totals
+    total_counts = {}
+
+    # for each player and sequence count
+    for p_tag, seq_count in player_seq_counts.items():
+        # sum the count for these actions
+        total_sequences = seq_count[seq_count[f'p{p_tag}_actionName'].isin(action_names)]['number_of_sequences'].sum()
+        # store the total for that player
+        total_counts[p_tag] = total_sequences
+
+    # store total for this action
+    round_metrics[action_label] = total_counts
+
+    # create empty to store total
+    action_total = total_metrics.setdefault(action_label, {"1": 0, "2": 0})
+
+    # for each player
+    for p_tag in total_counts:
+        # sum the for this action
+        action_total[p_tag] = action_total[p_tag] + round_metrics[action_label][p_tag]
+
+    return round_metrics, total_metrics
 
 
 def plot_player_damage(
@@ -353,7 +398,67 @@ def plot_drive_data(data, round_num, player_character):
     plt.close()
 
 
+def plot_table_metrics(data):
+    fig, ax = plt.subplots(figsize=(15, 5))
+    ax.axis('off')
+
+    headers = [""]
+    for round_key in sorted(data.keys()):
+        round_num = int(round_key) + 1
+        headers.extend([f"Round {round_num} Player 1", f"Round {round_num} Player 2"])
+    headers.extend(["Total Player 1", "Total Player 2"])
+    cell_data = [headers]
+
+    for metric in data['0'].keys():
+        row = [metric]
+        for round_key in sorted(data.keys()):
+            for player in ["1", "2"]:
+                row.append(data[round_key][metric][player])
+        total_player_1 = sum([data[round_key][metric]['1'] for round_key in data.keys()])
+        total_player_2 = sum([data[round_key][metric]['2'] for round_key in data.keys()])
+        row.extend([total_player_1, total_player_2])
+        cell_data.append(row)
+
+    # Calculate padding based on figure dimensions
+    padding_inch = 1
+    width_padding_fraction = padding_inch / fig.get_figwidth()
+    height_padding_fraction = padding_inch / fig.get_figheight()
+
+    bbox_left = width_padding_fraction
+    bbox_bottom = height_padding_fraction
+    bbox_width = 1 - 2 * width_padding_fraction
+    bbox_height = 1 - 2 * height_padding_fraction
+
+    table = ax.table(cellText=cell_data, loc='center', cellLoc='center',
+                     bbox=[bbox_left, bbox_bottom, bbox_width, bbox_height])
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+
+    col_count = len(headers)
+    table.auto_set_column_width(col=list(range(col_count)))
+    table.scale(1, 0.5)  # Here's the adjustment for the row height
+
+    header_color = "#505050"
+    metric_color = "#A0A0A0"
+
+    for key, cell in table.get_celld().items():
+        if key[0] == 0:
+            cell.set_facecolor(header_color)
+            cell.set_text_props(color='white')
+        else:
+            cell.set_facecolor(metric_color)
+            cell.set_text_props(color='black')
+
+    plt.title('Match Stats')
+    plt.tight_layout()
+    plt.savefig(f'stats_img/match_stats.png')
+    plt.close()
+
+
 def update_plots(rounds_df, player_character):
+    rounds_metrics = {}
+    total_metrics = {}
+
     for round_num, df in rounds_df.items():
         drive_round_stats = {}
         for _, p_id in enumerate(["2", "1"]):
@@ -365,6 +470,18 @@ def update_plots(rounds_df, player_character):
             drive_stats = generate_drive_stats(p_id, df)
             drive_round_stats[p_id] = drive_stats
         plot_drive_data(drive_round_stats, round_num, player_character)
+
+        action_counts = create_action_counts(df)
+        round_metrics = rounds_metrics.setdefault(str(round_num), {})
+
+        generate_action_count(action_counts, 'Perfect Parries', ["DPA_H(1)", "DPA_M(1)", "DPA_L(1)"], round_metrics,
+                              total_metrics)
+
+        generate_action_count(action_counts, 'Raw Drive Rushes', ["ATK_CTA_DASH"], round_metrics, total_metrics)
+
+        generate_action_count(action_counts, 'Throw Breaks', ["NGE"], round_metrics, total_metrics)
+
+        plot_table_metrics(rounds_metrics)
 
 
 def main():
