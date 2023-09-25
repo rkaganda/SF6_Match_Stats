@@ -141,17 +141,18 @@ class MatchStatsUI:
         self.master.after(100, self.check_for_updates)  # Check every 100ms
 
     def update_plots(self, s6_path):
-        # load recent replay file
-        rounds_df, player_character = replay_stats.load_recent_file(s6_path)
+        if replay_stats.replay_file_exists(filename=f"{s6_path}/reframework/data/{replay_stats.replay_name}"):
+            # load recent replay file
+            rounds_df, player_character = replay_stats.load_recent_file(s6_path)
 
-        # update status
-        self.status_queue.put("Updating Plots...")
-        self.status_update.set()
-        # write plots
-        replay_stats.update_plots(rounds_df, player_character)
-        # update status
-        self.status_queue.put("Updated Plots.")
-        self.status_update.set()
+            # update status
+            self.status_queue.put("Updating Plots...")
+            self.status_update.set()
+            # write plots
+            replay_stats.update_plots(rounds_df, player_character)
+            # update status
+            self.status_queue.put("Updated Plots.")
+            self.status_update.set()
 
         # while flag is set
         while self.keep_running.is_set():

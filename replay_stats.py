@@ -37,6 +37,9 @@ os.makedirs("stats_img", exist_ok=True)
 
 
 def watch_file_for_changes(filename, poll_interval=1.0):
+    while not replay_file_exists(filename):
+        time.sleep(poll_interval)
+
     # initial timestamp
     initial_timestamp = os.path.getmtime(filename)
 
@@ -50,6 +53,10 @@ def watch_file_for_changes(filename, poll_interval=1.0):
         # if the timestamp has changed, exit
         if current_timestamp != initial_timestamp:
             break
+
+
+def replay_file_exists(filename: str):
+    return os.path.exists(f"{filename}")
 
 
 def load_recent_file(sf6_path: str) -> tuple[dict[Any, DataFrame], dict[str, Any]]:
@@ -485,10 +492,11 @@ def update_plots(rounds_df, player_character):
 
 
 def main():
-    rounds_df, player_character = load_recent_file(replay_dir)
+    if replay_file_exists(filename=f"{replay_dir}/{replay_name}"):
+        rounds_df, player_character = load_recent_file(replay_dir)
 
-    update_plots(rounds_df, player_character)
-    print("updated plots")
+        update_plots(rounds_df, player_character)
+        print("updated plots")
 
     while True:
         print("watching file...")
